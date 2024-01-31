@@ -1,0 +1,82 @@
+import requests
+import json
+
+# Splunk credentials and API endpoint
+SPLUNK_HOST = 'your_splunk_host'
+SPLUNK_USERNAME = 'your_splunk_username'
+SPLUNK_PASSWORD = 'your_splunk_password'
+SPLUNK_SEARCH_ENDPOINT = f'https://{SPLUNK_HOST}/services/search/jobs'
+
+# Function to authenticate with Splunk
+def splunk_login():
+    auth_data = {
+        'username': SPLUNK_USERNAME,
+        'password': SPLUNK_PASSWORD
+    }
+
+    response = requests.post(f'https://{SPLUNK_HOST}/services/auth/login', data=auth_data)
+    
+    if response.status_code == 200:
+        session_key = response.text
+        return session_key
+    else:
+        print('Failed to authenticate with Splunk.')
+        return None
+
+# Function to search for alerts in Splunk
+def search_alerts(session_key):
+    search_query = 'search index=your_index sourcetype=your_sourcetype | head 100'
+    search_params = {
+        'search': search_query
+    }
+
+    headers = {
+        'Authorization': f'Splunk {session_key}'
+    }
+
+    response = requests.post(SPLUNK_SEARCH_ENDPOINT, data=search_params, headers=headers)
+    
+    if response.status_code == 201:
+        search_id = json.loads(response.text)['sid']
+        return search_id
+    else:
+        print('Failed to initiate search in Splunk.')
+        return None
+
+# Function to handle false alerts
+def handle_false_alerts(session_key, search_id):
+    # Fetch search results
+    search_results_endpoint = f'https://{SPLUNK_HOST}/services/search/jobs/{search_id}/results'
+    headers = {
+        'Authorization': f'Splunk {session_key}'
+    }
+
+    response = requests.get(search_results_endpoint, headers=headers)
+    
+    if response.status_code == 200:
+        search_results = json.loads(response.text)
+        
+        for result in search_results['results']:
+            # Process each result and handle false alerts as needed
+            print(result)
+    else:
+        print('Failed to fetch search results from Splunk.')
+
+# Main function
+def main():
+    # Authenticate with Splunk
+    session_key = splunk_login()
+    
+    if session_key:
+        # Search for alerts in Splunk
+        search_id = search_alerts(session_key)
+        
+        if search_id:
+            # Handle false alerts
+            handle_false_alerts(session_key, search_id)
+    else:
+        print('Exiting...')
+
+# Execute the main function
+if __name__ == '__main__':
+    main()
